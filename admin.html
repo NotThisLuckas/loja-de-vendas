@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>New Store – Admin</title>
+  <style>
+    :root { --bg:#0c0f14; --panel:#131a26; --blue:#1e90ff; --text:#eaf2ff; --dim:#a7b6cb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: linear-gradient(180deg, var(--bg), #172132); color: var(--text); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .card { background: rgba(19,26,38,0.85); border: 1px solid rgba(30,144,255,0.25); border-radius: 14px; padding: 16px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
+    input, textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(30,144,255,0.25); background: #0f1622; color: var(--text); }
+    button { appearance:none; border:0; border-radius:12px; padding:10px 14px; font-weight:700; background: linear-gradient(180deg, #74b9ff, #1e90ff); color:#041423; box-shadow:0 10px 20px rgba(30,144,255,0.35); cursor:pointer }
+    .grid { display:grid; gap:16px; grid-template-columns: 1fr 1fr; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    .muted { color: var(--dim); }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid rgba(30,144,255,0.2); padding:8px; }
+    .table-wrap { overflow:auto; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .row input { flex: 1 1 100%; } .wrap { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Admin</h1>
+    <div id="login" class="card">
+      <div class="row"><div class="muted">Acesso</div></div>
+      <div class="row"><input id="user" placeholder="Usuário" /><input id="pass" type="password" placeholder="Senha" /></div>
+      <div class="row"><button id="doLogin">Entrar</button></div>
+      <div class="muted">Usuário: admin · Senha: Luckas2411</div>
+    </div>
+    <div id="panel" style="display:none">
+      <div class="grid">
+        <div class="card">
+          <h2>Produtos</h2>
+          <div class="row">
+            <input id="pName" placeholder="Nome" />
+            <input id="pDesc" placeholder="Descrição" />
+            <input id="pPrice" placeholder="Preço" />
+            <input id="pImg" placeholder="URL da imagem" />
+            <input id="pDL" placeholder="URL de download" />
+            <button id="addP">Adicionar</button>
+          </div>
+          <table id="tblP"><thead><tr><th>Produto</th><th>Preço</th><th>Ativo</th><th>Ações</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div class="card table-wrap">
+          <h2>Pedidos</h2>
+          <table id="tblO"><thead><tr><th>ID</th><th>Produto</th><th>Status</th><th>Cliente</th><th>Ações</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import {getAdmin,setAdmin,seed,getProducts,setProducts,getOrders,approveOrder,rejectOrder,addProduct,toggleProduct,updateProduct} from './store.js';
+    seed();
+    const login=document.getElementById('login');
+    const panel=document.getElementById('panel');
+    const u=document.getElementById('user');
+    const p=document.getElementById('pass');
+    document.getElementById('doLogin').addEventListener('click',()=>{ if(u.value==='admin'&&p.value==='Luckas2411'){ setAdmin({logged:true}); login.style.display='none'; panel.style.display='block'; render(); } else { alert('Credenciais inválidas'); } });
+    if(getAdmin().logged){ login.style.display='none'; panel.style.display='block'; render(); }
+    function render(){ renderProducts(); renderOrders(); }
+    function renderProducts(){ const tbody=document.querySelector('#tblP tbody'); tbody.innerHTML=''; const products=getProducts(); for(const x of products){ const tr=document.createElement('tr'); tr.innerHTML=`<td>${x.name}</td><td>R$ ${x.price.toFixed(2)}</td><td>${x.active?'Sim':'Não'}</td><td><button data-act="toggle" data-id="${x.id}">Ativar/Desativar</button> <button data-act="edit" data-id="${x.id}">Editar</button></td>`; tbody.appendChild(tr);} tbody.querySelectorAll('button').forEach(b=>b.addEventListener('click',onProductAction)); }
+    function onProductAction(e){ const id=e.currentTarget.getAttribute('data-id'); const act=e.currentTarget.getAttribute('data-act'); if(act==='toggle'){ toggleProduct(id); renderProducts(); } else if(act==='edit'){ const v=prompt('Novo preço'); const d=prompt('Nova descrição'); const i=prompt('Nova URL da imagem'); const dl=prompt('Nova URL de download'); const patch={}; if(v) patch.price=parseFloat(v); if(d) patch.desc=d; if(i) patch.img=i; if(dl) patch.downloadURL=dl; updateProduct(id,patch); renderProducts(); } }
+    document.getElementById('addP').addEventListener('click',()=>{ const name=document.getElementById('pName').value; const desc=document.getElementById('pDesc').value; const price=parseFloat(document.getElementById('pPrice').value||'0'); const img=document.getElementById('pImg').value; const downloadURL=document.getElementById('pDL').value; if(!name||!price){ alert('Informe nome e preço'); return; } addProduct({name,desc,price,img,downloadURL}); document.getElementById('pName').value=''; document.getElementById('pDesc').value=''; document.getElementById('pPrice').value=''; document.getElementById('pImg').value=''; document.getElementById('pDL').value=''; renderProducts(); });
+    function renderOrders(){ const tbody=document.querySelector('#tblO tbody'); tbody.innerHTML=''; const orders=getOrders(); const products=getProducts(); for(const o of orders){ const prod=products.find(p=>p.id===o.productId); const tr=document.createElement('tr'); tr.innerHTML=`<td>${o.id}</td><td>${prod?prod.name:'-'}</td><td>${o.status}</td><td>${o.customer||''}</td><td>${o.status==='awaiting_approval'?'<button data-act="approve" data-id="'+o.id+'">Aprovar</button> <button data-act="reject" data-id="'+o.id+'">Rejeitar</button>':''}</td>`; tbody.appendChild(tr);} tbody.querySelectorAll('button').forEach(b=>b.addEventListener('click',onOrderAction)); }
+    function onOrderAction(e){ const id=e.currentTarget.getAttribute('data-id'); const act=e.currentTarget.getAttribute('data-act'); if(act==='approve'){ approveOrder(id); renderOrders(); } else if(act==='reject'){ rejectOrder(id); renderOrders(); } }
+  </script>
+</body>
+</html>
